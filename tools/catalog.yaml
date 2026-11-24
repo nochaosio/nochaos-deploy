@@ -1,0 +1,172 @@
+# The open-source tools nochaos is built on.
+#
+# nochaos is a layer above these tools: it does not replace them, it wires
+# them into one product (accounts, permissions, one portal, one way to
+# install). Every plugin names the tools it uses by the ids below
+# (plugin.yaml, field `tools`).
+#
+# role:      what the tool does for nochaos
+# version:   the version the platform ships today
+# profiles:  the installation profiles that run it (single, ha, cloud)
+# used_by:   the plugins built on it ("platform" = the backbone itself)
+tools:
+  - id: victoriametrics
+    name: VictoriaMetrics
+    role: Metrics store (PromQL and MetricsQL)
+    license: Apache-2.0
+    version: "1.154.0"
+    homepage: https://victoriametrics.com
+    profiles: [ha, cloud]
+    used_by: [metrics, apm, infrastructure, slo, anomalies, dashboards, alerts]
+
+  - id: victorialogs
+    name: VictoriaLogs
+    role: Logs store (LogsQL)
+    license: Apache-2.0
+    version: "1.53.0"
+    homepage: https://docs.victoriametrics.com/victorialogs/
+    profiles: [ha, cloud]
+    used_by: [logs, anomalies, dashboards, alerts]
+
+  - id: victoriatraces
+    name: VictoriaTraces
+    role: Traces store (Jaeger query API)
+    license: Apache-2.0
+    version: "0.12.0"
+    homepage: https://docs.victoriametrics.com/victoriatraces/
+    profiles: [ha, cloud]
+    used_by: [apm, llm]
+
+  - id: clickhouse
+    name: ClickHouse
+    role: Business events store; the single store of the single-machine profile
+    license: Apache-2.0
+    version: "26.3"
+    homepage: https://clickhouse.com
+    profiles: [single, ha, cloud]
+    used_by: [events, analytics, dashboards, alerts]
+
+  - id: postgresql
+    name: PostgreSQL
+    role: The platform's database (accounts, configuration, plugin state)
+    license: PostgreSQL
+    version: "18.6"
+    homepage: https://www.postgresql.org
+    profiles: [single, ha, cloud]
+    used_by: [platform, incidents, catalog, synthetics, rum, deployments]
+
+  - id: redis
+    name: Redis
+    role: Sessions, quotas and live rates
+    license: RSALv2 / SSPLv1 / AGPL-3.0
+    version: "8"
+    homepage: https://redis.io
+    profiles: [ha, cloud]
+    used_by: [platform]
+
+  - id: kafka
+    name: Apache Kafka
+    role: Ingestion queue between the gateways and the stores
+    license: Apache-2.0
+    version: "4.3.1"
+    homepage: https://kafka.apache.org
+    profiles: [cloud]
+    used_by: [platform, flow]
+
+  - id: flink
+    name: Apache Flink
+    role: Stream aggregation (usage, quotas, SLOs, log patterns, service graph)
+    license: Apache-2.0
+    version: "2.2.1"
+    homepage: https://flink.apache.org
+    profiles: [cloud]
+    used_by: [apm, logs, slo, deployments, schema, flow]
+
+  - id: opentelemetry-collector
+    name: OpenTelemetry Collector (contrib)
+    role: OTLP gateways, span metrics, Kafka consumers
+    license: Apache-2.0
+    version: "0.162.0"
+    homepage: https://opentelemetry.io/docs/collector/
+    profiles: [single, ha, cloud]
+    used_by: [platform, apm, infrastructure]
+
+  - id: vector
+    name: Vector
+    role: Gateway of business events
+    license: MPL-2.0
+    version: "0.59.0"
+    homepage: https://vector.dev
+    profiles: [ha, cloud]
+    used_by: [events]
+
+  - id: envoy
+    name: Envoy
+    role: The edge of ingestion and of the portal (TLS, rate limits, external authorization)
+    license: Apache-2.0
+    version: "1.40.0"
+    homepage: https://www.envoyproxy.io
+    profiles: [ha, cloud]
+    used_by: [platform]
+
+  - id: grafana
+    name: Grafana
+    role: Embedded explorers and dashboards next to the native ones
+    license: AGPL-3.0
+    version: "13.2.5"
+    homepage: https://grafana.com/oss/grafana/
+    profiles: [single, ha, cloud]
+    used_by: [dashboards, logs, metrics]
+
+  - id: jaeger-ui
+    name: Jaeger UI
+    role: Embedded trace viewer
+    license: Apache-2.0
+    homepage: https://www.jaegertracing.io
+    profiles: [ha, cloud]
+    used_by: [apm]
+
+  - id: garage
+    name: Garage
+    role: S3-compatible object store for session recordings
+    license: AGPL-3.0
+    version: "2.4.1"
+    homepage: https://garagehq.deuxfleurs.fr
+    profiles: [ha, cloud]
+    used_by: [replay]
+
+  - id: flagd
+    name: flagd (OpenFeature)
+    role: Feature flags per account (module.<plugin id>)
+    license: Apache-2.0
+    version: "0.17.0"
+    homepage: https://flagd.dev
+    profiles: [ha, cloud]
+    used_by: [platform]
+
+  - id: rrweb
+    name: rrweb
+    role: Records and replays browser sessions
+    license: MIT
+    version: "2.2"
+    homepage: https://www.rrweb.io
+    profiles: [single, ha, cloud]
+    used_by: [replay]
+
+  - id: uplot
+    name: uPlot
+    role: Charts of the portal
+    license: MIT
+    version: "1.6"
+    homepage: https://github.com/leeoniya/uPlot
+    profiles: [single, ha, cloud]
+    used_by: [platform]
+
+  - id: react
+    name: React
+    role: The portal
+    license: MIT
+    version: "19"
+    homepage: https://react.dev
+    profiles: [single, ha, cloud]
+    used_by: [platform]
