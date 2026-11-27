@@ -91,6 +91,7 @@ kubectl -n "$ns" create job e2e-loadgen --image="$img" -- /usr/local/bin/loadgen
 
 echo "== read back"
 eventually "traces searchable" [ "$(api "$A/api/traces/services" | jq 'length')" -gt 0 ]
+[ "$(api "$A/api/traces/services" | jq 'length' 2>/dev/null)" -gt 0 ] 2>/dev/null || echo "        last answer: $(curl -sS -b "$C" -w ' HTTP %{http_code}' "$A/api/traces/services" | head -c 300)"
 eventually "RED metrics from spans (spanmetrics, 60 s flush)" [ "$(api "$A/api/red/services?range=15m" | jq '[.services[]?] | length')" -gt 0 ]
 eventually "hosts (infrastructure metrics)" [ "$(api "$A/api/infra/hosts" | jq 'length')" -gt 0 ]
 eventually "events in ClickHouse" [ "$(api "$A/api/events/search?range=15m" | jq 'length')" -gt 0 ]
