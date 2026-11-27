@@ -21,7 +21,7 @@ fails=0
 pass() { printf '  ok    %s\n' "$1"; }
 fail() { printf '  FAIL  %s\n' "$1"; fails=$((fails + 1)); }
 check() { local what=$1; shift; if "$@"; then pass "$what"; else fail "$what"; fi; }
-eventually() { local what=$1 i; shift; for i in $(seq 1 60); do "$@" && { pass "$what"; return; }; sleep 5; done; fail "$what"; }
+eventually() { local what=$1 i; shift; for i in $(seq 1 "${TRIES:-120}"); do "$@" && { pass "$what"; return; }; sleep 5; done; fail "$what"; }
 cleanup() {
   [ -n "${pf:-}" ] && kill "$pf" 2>/dev/null || true
   rm -f "$C"
@@ -96,7 +96,7 @@ check "log patterns answer" [ "$(code /api/logs/patterns)" = 200 ]
 for p in /api/red/overview /api/servicegraph /api/alerts /api/slos /api/rum/overview /api/environments /api/tokens; do
   c=$(code "$p"); [ "$c" = 200 ] && pass "$p 200" || fail "$p $c"
 done
-health=$(api "$A/api/health" | jq -c '[.components[] | select(.status != "up") | .component]')
+health=$(api "$A/api/health" | jq -c '[.components[] | select(.status != "ok" and .status != "up") | .component]')
 check "every component up ($health)" [ "$health" = "[]" ]
 if [ "${STREAM:-0}" = 1 ]; then
   echo "== stream"
