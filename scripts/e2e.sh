@@ -15,7 +15,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 cluster=${CLUSTER:-nochaos-e2e} ns=${NAMESPACE:-nochaos} rel=${RELEASE:-nochaos}
 app_port=${APP_PORT:-18180} ingest_port=${INGEST_PORT:-18318}
 A="http://127.0.0.1:$app_port" C="$(mktemp)"
-user=admin pass="e2e-$(openssl rand -hex 8)"
+user=owner pass="e2e-$(openssl rand -hex 8)"
 helm=${HELM:-helm}
 fails=0
 pass() { printf '  ok    %s\n' "$1"; }
