@@ -31,6 +31,9 @@ trap cleanup EXIT
 
 kind get clusters | grep -qx "$cluster" || kind create cluster --name "$cluster" --wait 120s
 kubectl config use-context "kind-$cluster" >/dev/null
+# A rerun on the same cluster keeps the admin the first run already made.
+old_pass=$(kubectl -n "$ns" get secret "$rel-admin" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+[ -n "$old_pass" ] && pass=$old_pass
 
 sets=(--set "global.publicURL=$A" --set "global.ingestURL=http://127.0.0.1:$ingest_port"
   --set platform.admin.organization=E2E --set platform.admin.email=admin@example.com
