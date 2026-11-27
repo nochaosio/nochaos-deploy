@@ -1,2 +1,113 @@
 apiVersion: v1
-entries: {}
+entries:
+  nochaos:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2026-11-27T02:45:47.537187748Z"
+    dependencies:
+    - alias: platform
+      name: nochaos-platform
+      repository: file://../nochaos-platform
+      version: 0.1.0
+    - alias: stores
+      name: nochaos-stores
+      repository: file://../nochaos-stores
+      version: 0.1.0
+    - alias: stream
+      condition: global.stream.enabled
+      name: nochaos-stream
+      repository: file://../nochaos-stream
+      version: 0.1.0
+    description: The whole nochaos community edition in one release (platform, stores
+      and, optionally, stream analytics)
+    digest: 60815efea59f29964d3b84a389dd7969f6f616d00bbfbefecfae2fbdca64c42f
+    home: https://github.com/nochaosio/nochaos
+    keywords:
+    - nochaos
+    - observability
+    - opentelemetry
+    maintainers:
+    - name: nochaos
+      url: https://github.com/nochaosio
+    name: nochaos
+    sources:
+    - https://github.com/nochaosio/nochaos-deploy
+    type: application
+    urls:
+    - https://github.com/nochaosio/nochaos-deploy/releases/download/nochaos-0.1.0/nochaos-0.1.0.tgz
+    version: 0.1.0
+  nochaos-platform:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2026-11-27T02:45:47.692188874Z"
+    description: The nochaos community edition platform (API, portal, ingestion edge,
+      telemetry pipeline, alerting, synthetic probes, RUM) with PostgreSQL, Redis,
+      Garage and flagd
+    digest: 2b1d41182b4708597f1ad80fb34002ffb5c0cb47b1083136be9df3a496314da5
+    home: https://github.com/nochaosio/nochaos
+    keywords:
+    - nochaos
+    - observability
+    - opentelemetry
+    - apm
+    - rum
+    maintainers:
+    - name: nochaos
+      url: https://github.com/nochaosio
+    name: nochaos-platform
+    sources:
+    - https://github.com/nochaosio/nochaos-deploy
+    - https://github.com/nochaosio/nochaos
+    type: application
+    urls:
+    - https://github.com/nochaosio/nochaos-deploy/releases/download/nochaos-platform-0.1.0/nochaos-platform-0.1.0.tgz
+    version: 0.1.0
+  nochaos-stores:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2026-11-27T02:45:47.835244071Z"
+    description: The fixed stores of a nochaos community installation (VictoriaMetrics,
+      VictoriaLogs, VictoriaTraces, ClickHouse, Grafana and Jaeger UI)
+    digest: d5a99d4ac1795628094b4366da6df984a4522622318353d36184bf8bfed5a836
+    home: https://github.com/nochaosio/nochaos
+    keywords:
+    - nochaos
+    - observability
+    - opentelemetry
+    - victoriametrics
+    - clickhouse
+    - grafana
+    maintainers:
+    - name: nochaos
+      url: https://github.com/nochaosio
+    name: nochaos-stores
+    sources:
+    - https://github.com/nochaosio/nochaos-deploy
+    type: application
+    urls:
+    - https://github.com/nochaosio/nochaos-deploy/releases/download/nochaos-stores-0.1.0/nochaos-stores-0.1.0.tgz
+    version: 0.1.0
+  nochaos-stream:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2026-11-27T02:45:48.005897551Z"
+    description: Stream analytics of a nochaos community installation (Kafka and a
+      Flink session cluster running the nochaos jobs)
+    digest: f2fbb94c5e980f5458a77d8ec466272a16870e6a985edc483768b0af4703d182
+    home: https://github.com/nochaosio/nochaos
+    keywords:
+    - nochaos
+    - kafka
+    - flink
+    - stream
+    maintainers:
+    - name: nochaos
+      url: https://github.com/nochaosio
+    name: nochaos-stream
+    sources:
+    - https://github.com/nochaosio/nochaos-deploy
+    type: application
+    urls:
+    - https://github.com/nochaosio/nochaos-deploy/releases/download/nochaos-stream-0.1.0/nochaos-stream-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-11-27T02:45:48.005906033Z"
