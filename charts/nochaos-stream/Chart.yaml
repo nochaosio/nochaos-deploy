@@ -1,0 +1,13 @@
+apiVersion: v2
+name: nochaos-stream
+description: Stream analytics of a nochaos community installation (Kafka and a Flink session cluster running the nochaos jobs)
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
+home: https://github.com/nochaosio/nochaos
+sources:
+  - https://github.com/nochaosio/nochaos-deploy
+keywords: [nochaos, kafka, flink, stream]
+maintainers:
+  - name: nochaos
+    url: https://github.com/nochaosio

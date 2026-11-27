@@ -1,0 +1,11 @@
+# External PostgreSQL, Redis and S3, an ingress, the stream on.
+postgresql: {enabled: false}
+externalDatabase: {url: "postgres://oop:pw@db.example.com:5432/oop?sslmode=require"}
+redis: {enabled: false}
+externalRedis: {address: redis.example.com:6379, password: pw}
+garage: {enabled: false}
+externalS3: {endpoint: s3.example.com, accessKey: AK, secretKey: SK}
+stream: {enabled: true}
+edge: {trustedHops: 1}
+ingress: {enabled: true, className: nginx}
+admin: {email: admin@example.com, username: admin, password: change-me}

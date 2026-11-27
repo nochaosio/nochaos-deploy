@@ -1,0 +1,18 @@
+# Everything of nochaos-platform, nochaos-stores and nochaos-stream can be
+# set under platform:, stores: and stream: (see each chart's values.yaml).
+global:
+  # Prefix of every object name (default: the release name).
+  prefix: ""
+  imageRegistry: ""
+  storageClass: ""
+  # Where people open the portal, and where SDKs send OTLP.
+  publicURL: http://localhost:8080
+  ingestURL: http://localhost:4318
+  # Kafka and Flink: usage, trace analytics, log patterns, schema drift and
+  # insights. Needs about 4 GiB of memory more.
+  stream:
+    enabled: false
+
+platform: {}
+stores: {}
+stream: {}

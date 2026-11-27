@@ -1,0 +1,28 @@
+{{- if .Values.ingress.enabled }}
+{{- $ctx := dict "ctx" $ "name" "edge" }}
+{{- $svc := include "platform.name" $ctx }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $svc }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.app.host | quote }}
+      http:
+        paths:
+          - {path: /, pathType: Prefix, backend: {service: {name: {{ $svc }}, port: {name: app}}}}
+    - host: {{ .Values.ingress.ingest.host | quote }}
+      http:
+        paths:
+          - {path: /, pathType: Prefix, backend: {service: {name: {{ $svc }}, port: {name: ingest}}}}
+{{- end }}

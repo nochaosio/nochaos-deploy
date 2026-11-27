@@ -1,0 +1,4 @@
+nochaos stores are installed with the prefix "{{ include "stores.prefix" . }}".
+
+The platform chart finds them through TENANT_BACKENDS:
+{{- include "stores.backends" . | nindent 2 }}

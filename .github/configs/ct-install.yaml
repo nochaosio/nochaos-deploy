@@ -1,0 +1,9 @@
+# ct install in CI: only charts whose images are all public. The platform,
+# stream and umbrella charts need the nochaos images (scripts/e2e.sh).
+remote: origin
+target-branch: main
+chart-dirs: [charts]
+excluded-charts: [nochaos, nochaos-platform, nochaos-stream]
+helm-extra-args: --timeout 900s
+validate-maintainers: false
+check-version-increment: false

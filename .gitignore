@@ -1,1 +1,6 @@
 __pycache__/
+.cr-release-packages/
+.cr-index/
+charts/*/charts/
+charts/*/Chart.lock
+*.tgz

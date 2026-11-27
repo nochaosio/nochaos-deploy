@@ -1,0 +1,13 @@
+apiVersion: v2
+name: nochaos-stores
+description: The fixed stores of a nochaos community installation (VictoriaMetrics, VictoriaLogs, VictoriaTraces, ClickHouse, Grafana and Jaeger UI)
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
+home: https://github.com/nochaosio/nochaos
+sources:
+  - https://github.com/nochaosio/nochaos-deploy
+keywords: [nochaos, observability, opentelemetry, victoriametrics, clickhouse, grafana]
+maintainers:
+  - name: nochaos
+    url: https://github.com/nochaosio

@@ -1,0 +1,27 @@
+apiVersion: v2
+name: nochaos
+description: The whole nochaos community edition in one release (platform, stores and, optionally, stream analytics)
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
+home: https://github.com/nochaosio/nochaos
+sources:
+  - https://github.com/nochaosio/nochaos-deploy
+keywords: [nochaos, observability, opentelemetry]
+maintainers:
+  - name: nochaos
+    url: https://github.com/nochaosio
+dependencies:
+  - name: nochaos-platform
+    version: 0.1.0
+    repository: file://../nochaos-platform
+    alias: platform
+  - name: nochaos-stores
+    version: 0.1.0
+    repository: file://../nochaos-stores
+    alias: stores
+  - name: nochaos-stream
+    version: 0.1.0
+    repository: file://../nochaos-stream
+    alias: stream
+    condition: global.stream.enabled

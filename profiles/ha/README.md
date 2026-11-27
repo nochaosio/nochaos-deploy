@@ -10,8 +10,14 @@ platform components as separate deployments (api, ingest, alerter, router)
 VictoriaMetrics, VictoriaLogs, VictoriaTraces, ClickHouse, PostgreSQL, Redis, Garage
 ```
 
+## How to install
+
+With the Helm charts in [charts/](../../charts), published at
+`https://nochaosio.github.io/nochaos-deploy` (see the
+[README](../../README.md#helm-charts)). The tools run at the versions of
+[TOOLS.md](../../TOOLS.md).
+
 ## Status
 
-Planned. The Helm chart lands here once the platform can run each component
-as its own process from released images, with the tools of
-[TOOLS.md](../../TOOLS.md) at the listed versions.
+Charts published. The end-to-end run on kind and the public nochaos images
+are still pending (see the open issues).

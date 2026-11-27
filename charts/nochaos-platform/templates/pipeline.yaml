@@ -1,0 +1,110 @@
+{{- $ctx := dict "ctx" $ "name" "pipeline" }}
+{{- $conf := include "platform.pipelineConfig" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "platform.name" $ctx }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+data:
+  config.yaml: |
+    {{- $conf | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.name" $ctx }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+spec:
+  selector: {{- include "platform.selector" $ctx | nindent 4 }}
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: otlp-grpc, appProtocol: grpc}
+    - {name: otlp-http, port: 4318, targetPort: otlp-http}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.name" $ctx }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+spec:
+  # spanmetrics aggregates in memory: more than one replica splits the RED
+  # counts of a service across replicas (each flushes its own share).
+  replicas: {{ .Values.pipeline.replicas }}
+  selector:
+    matchLabels: {{- include "platform.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "platform.labels" $ctx | nindent 8 }}
+      annotations:
+        checksum/config: {{ $conf | sha256sum | trunc 16 }}
+    spec:
+      {{- include "platform.pullSecrets" . | nindent 6 }}
+      {{- include "platform.podSecurity" (dict "uid" 10001) | nindent 6 }}
+      {{- include "platform.scheduling" .Values | nindent 6 }}
+      containers:
+        - name: otelcol
+          image: {{ include "platform.image" (dict "ctx" $ "img" .Values.pipeline.image) }}
+          args: [--config=/etc/otelcol/config.yaml]
+          ports: [{name: otlp-grpc, containerPort: 4317}, {name: otlp-http, containerPort: 4318}, {name: health, containerPort: 13133}]
+          readinessProbe: {httpGet: {path: /, port: health}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /, port: health}, periodSeconds: 20}
+          resources: {{- toYaml .Values.pipeline.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts: [{name: config, mountPath: /etc/otelcol, readOnly: true}]
+      volumes:
+        - {name: config, configMap: {name: {{ include "platform.name" $ctx }}}}
+{{- if .Values.modules.events }}
+{{- $ectx := dict "ctx" $ "name" "events-gw" }}
+{{- $econf := include "platform.eventsConfig" . }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "platform.name" $ectx }}
+  labels: {{- include "platform.labels" $ectx | nindent 4 }}
+data:
+  vector.yaml: |
+    {{- $econf | nindent 4 }}
+---
+{{ include "platform.service" (merge (dict "port" 8080) $ectx) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.name" $ectx }}
+  labels: {{- include "platform.labels" $ectx | nindent 4 }}
+spec:
+  replicas: {{ .Values.eventsGateway.replicas }}
+  selector:
+    matchLabels: {{- include "platform.selector" $ectx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "platform.labels" $ectx | nindent 8 }}
+      annotations:
+        checksum/config: {{ $econf | sha256sum | trunc 16 }}
+    spec:
+      {{- include "platform.pullSecrets" . | nindent 6 }}
+      {{- include "platform.podSecurity" (dict "uid" 1000) | nindent 6 }}
+      {{- include "platform.scheduling" .Values | nindent 6 }}
+      containers:
+        - name: vector
+          image: {{ include "platform.image" (dict "ctx" $ "img" .Values.eventsGateway.image) }}
+          args: [--config, /etc/vector/vector.yaml]
+          env:
+            - {name: VECTOR_DATA_DIR, value: /var/lib/vector}
+          ports: [{name: http, containerPort: 8080}, {name: api, containerPort: 8686}]
+          readinessProbe: {httpGet: {path: /health, port: api}, periodSeconds: 5}
+          resources: {{- toYaml .Values.eventsGateway.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/vector, readOnly: true}
+            - {name: data, mountPath: /var/lib/vector}
+      volumes:
+        - {name: config, configMap: {name: {{ include "platform.name" $ectx }}}}
+        - {name: data, emptyDir: {}}
+{{- end }}

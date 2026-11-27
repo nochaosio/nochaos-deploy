@@ -1,0 +1,160 @@
+{{- if .Values.events.enabled }}
+{{- /*
+ClickHouse for business events. Users: writer (INSERT on oop.events, used by
+tenant-router), grafana (read only), eraser (erasure: DELETE on oop.events,
+used by the API). "default" only answers on localhost, for the schema.
+*/ -}}
+{{- $ctx := dict "ctx" $ "name" "events" }}
+{{- $days := int .Values.events.retentionDays }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stores.name" $ctx }}
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+data:
+  oop-server.xml: |
+    <clickhouse>
+      <logger><level>warning</level><console>1</console></logger>
+      <max_server_memory_usage>{{ int64 .Values.events.maxServerMemory }}</max_server_memory_usage>
+      <mark_cache_size>67108864</mark_cache_size>
+      <uncompressed_cache_size>0</uncompressed_cache_size>
+      <query_log remove="1"/>
+      <query_thread_log remove="1"/>
+      <query_views_log remove="1"/>
+      <part_log remove="1"/>
+      <trace_log remove="1"/>
+      <text_log remove="1"/>
+      <metric_log remove="1"/>
+      <asynchronous_metric_log remove="1"/>
+      <latency_log remove="1"/>
+      <error_log remove="1"/>
+      <processors_profile_log remove="1"/>
+      <opentelemetry_span_log remove="1"/>
+      <session_log remove="1"/>
+      <prometheus>
+        <endpoint>/metrics</endpoint>
+        <port>9363</port>
+        <metrics>true</metrics>
+        <events>false</events>
+        <asynchronous_metrics>true</asynchronous_metrics>
+      </prometheus>
+    </clickhouse>
+  oop-users.xml: |
+    <clickhouse>
+      <profiles>
+        <writer><max_memory_usage>268435456</max_memory_usage><async_insert>1</async_insert><wait_for_async_insert>1</wait_for_async_insert><date_time_input_format>best_effort</date_time_input_format></writer>
+        <reader>
+          <readonly>2</readonly><max_memory_usage>268435456</max_memory_usage><max_execution_time>60</max_execution_time>
+          <constraints>
+            <max_memory_usage><max>268435456</max></max_memory_usage>
+            <max_execution_time><max>60</max></max_execution_time>
+            <max_result_rows><max>100000</max></max_result_rows>
+            <readonly><min>2</min><max>2</max></readonly>
+          </constraints>
+        </reader>
+      </profiles>
+      <users>
+        <default>
+          <networks replace="replace"><ip>::1</ip><ip>127.0.0.1</ip></networks>
+        </default>
+        <writer>
+          <no_password/>
+          <networks><ip>::/0</ip></networks>
+          <profile>writer</profile>
+          <quota>default</quota>
+          <grants><query>GRANT INSERT ON oop.events</query></grants>
+        </writer>
+        <eraser>
+          <no_password/>
+          <networks><ip>::/0</ip></networks>
+          <profile>writer</profile>
+          <quota>default</quota>
+          <grants><query>GRANT SELECT, ALTER DELETE ON oop.events</query><query>GRANT SELECT ON system.parts</query></grants>
+        </eraser>
+        <grafana>
+          <no_password/>
+          <networks><ip>::/0</ip></networks>
+          <profile>reader</profile>
+          <quota>default</quota>
+          <grants><query>GRANT SELECT ON oop.*</query></grants>
+        </grafana>
+      </users>
+    </clickhouse>
+  schema.sql: |
+    CREATE DATABASE IF NOT EXISTS oop;
+    CREATE TABLE IF NOT EXISTS oop.events
+    (
+        timestamp  DateTime64(3) DEFAULT now64(3),
+        event_type  LowCardinality(String),
+        environment LowCardinality(String) DEFAULT 'production',
+        body        JSON,
+        search_text String MATERIALIZED lower(concat(event_type, char(0), toJSONString(body))) CODEC(ZSTD(1)),
+        INDEX search_text_ngram search_text TYPE ngrambf_v1(3, 8192, 2, 0) GRANULARITY 1
+    )
+    ENGINE = MergeTree
+    PARTITION BY toDate(timestamp)
+    ORDER BY (event_type, timestamp)
+    TTL toDateTime(timestamp) + INTERVAL {{ $days }} DAY DELETE;
+    ALTER TABLE oop.events MODIFY TTL toDateTime(timestamp) + INTERVAL {{ $days }} DAY DELETE;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stores.name" $ctx }}
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+spec:
+  selector: {{- include "stores.selector" $ctx | nindent 4 }}
+  ports: [{name: http, port: 8123, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "stores.name" $ctx }}
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+spec:
+  serviceName: {{ include "stores.name" $ctx }}
+  replicas: 1
+  selector:
+    matchLabels: {{- include "stores.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stores.labels" $ctx | nindent 8 }}
+      annotations:
+        # subPath mounts never see ConfigMap updates: a change restarts ClickHouse.
+        checksum/config: {{ printf "%v-%v" $days .Values.events.maxServerMemory | sha256sum | trunc 16 }}
+    spec:
+      {{- include "stores.podSecurity" (dict "uid" 101) | nindent 6 }}
+      {{- include "stores.scheduling" .Values | nindent 6 }}
+      containers:
+        - name: clickhouse
+          image: {{ include "stores.image" (dict "ctx" $ "img" .Values.events.image) }}
+          env:
+            - {name: CLICKHOUSE_DO_NOT_CHOWN, value: "1"}
+            - {name: CLICKHOUSE_SKIP_USER_SETUP, value: "1"}
+          ports: [{name: http, containerPort: 8123}, {name: metrics, containerPort: 9363}]
+          # Ready once the schema exists (postStart below creates it).
+          readinessProbe:
+            exec: {command: [clickhouse-client, -q, "EXISTS TABLE oop.events"]}
+            periodSeconds: 5
+          livenessProbe: {httpGet: {path: /ping, port: http}, periodSeconds: 20, failureThreshold: 6}
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - for i in $(seq 1 60); do clickhouse-client --multiquery < /etc/clickhouse-server/oop/schema.sql && exit 0; sleep 2; done; exit 1
+          resources: {{- toYaml .Values.events.resources | nindent 12 }}
+          {{- include "stores.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/clickhouse}
+            - {name: config, mountPath: /etc/clickhouse-server/config.d/oop-server.xml, subPath: oop-server.xml}
+            - {name: config, mountPath: /etc/clickhouse-server/users.d/oop-users.xml, subPath: oop-users.xml}
+            - {name: config, mountPath: /etc/clickhouse-server/oop/schema.sql, subPath: schema.sql}
+            - {name: logs, mountPath: /var/log/clickhouse-server}
+      volumes:
+        - {name: config, configMap: {name: {{ include "stores.name" $ctx }}}}
+        - {name: logs, emptyDir: {}}
+        {{- include "stores.dataVolume" .Values.events | nindent 8 }}
+  {{- include "stores.claims" (dict "persistence" .Values.events.persistence "global" (include "stores.storesStorageClass" .)) | nindent 2 }}
+{{- end }}

@@ -1,0 +1,57 @@
+{{- $p := include "platform.prefix" . }}
+{{- $rum := include "platform.rumOn" . }}
+{{- /* api: the portal's backend, the first run and every module's API. It runs the database migrations. */ -}}
+{{- $env := list
+  (include "platform.env.edition" .)
+  (include "platform.env.database" .)
+  (include "platform.env.redis" .)
+  (include "platform.env.notify" .)
+  (include "platform.env.flags" .)
+  (include "platform.env.smtp" .)
+}}
+{{- $api := cat (join "\n" $env) }}
+{{- $api = printf "%s\n- {name: PUBLIC_URL, value: %s}\n- {name: INGEST_URL, value: %s}\n- {name: COOKIE_SECURE, value: %s}" $api (include "platform.publicURL" . | quote) (include "platform.ingestURL" . | quote) (hasPrefix "https://" (include "platform.publicURL" .) | toString | quote) }}
+{{- $api = printf "%s\n- {name: RATE_LIMIT_RPS, value: %s}\n- {name: RETENTION_DAYS, value: %s}\n- {name: RUM_REPLAY, value: %s}" $api (.Values.guards.rateLimitRPS | toString | quote) (.Values.guards.retentionDays | toString | quote) (.Values.guards.rumReplay | toString | quote) }}
+{{- if .Values.modules.synthetics }}
+{{- $api = printf "%s\n- {name: PROBER_URL, value: \"http://%s-prober:8080\"}" $api $p }}
+{{- end }}
+{{- if $rum }}
+{{- $api = printf "%s\n%s" $api (include "platform.env.s3" .) }}
+{{- end }}
+{{- if .Values.admin.email }}
+{{- $api = printf "%s\n- {name: ADMIN_EMAIL, value: %s}\n- {name: ADMIN_USERNAME, value: %s}\n- {name: ADMIN_ORGANIZATION, value: %s}" $api (.Values.admin.email | quote) (required "admin.username is required with admin.email" .Values.admin.username | quote) (.Values.admin.organization | quote) }}
+{{- $api = printf "%s\n- name: ADMIN_PASSWORD\n  valueFrom: {secretKeyRef: {name: %s, key: password}}" $api (.Values.admin.existingSecret | default (printf "%s-admin" $p)) }}
+{{- end }}
+{{ include "platform.goWorkload" (dict "ctx" $ "name" "api" "binary" "api" "port" 8080 "probePort" 8080 "probe" "/readyz" "values" .Values.api "env" $api) }}
+---
+{{- /* authz: checks every ingestion request (API key, rate limit). */ -}}
+{{- $authz := join "\n" (list (include "platform.env.edition" .) (include "platform.env.database" .) (include "platform.env.redis" .)) }}
+{{- $authz = printf "%s\n- {name: RATE_LIMIT_RPS, value: %s}\n- {name: REPLICAS, value: %s}" $authz (.Values.guards.rateLimitRPS | toString | quote) (.Values.authz.replicas | toString | quote) }}
+{{ include "platform.goWorkload" (dict "ctx" $ "name" "authz" "binary" "authz" "port" 9000 "probePort" 9000 "probe" "/healthz" "values" .Values.authz "env" $authz) }}
+---
+{{- /* tenant-router: writes every signal to the fixed stores. */ -}}
+{{- $router := join "\n" (list (include "platform.env.edition" .) (include "platform.env.redis" .)) }}
+{{ include "platform.goWorkload" (dict "ctx" $ "name" "tenant-router" "binary" "tenant-router" "port" 4318 "probePort" 4318 "probe" "/healthz" "values" .Values.tenantRouter "env" $router) }}
+{{- if .Values.modules.alerts }}
+---
+{{- $alerter := join "\n" (list (include "platform.env.edition" .) (include "platform.env.database" .) (include "platform.env.notify" .) (include "platform.env.flags" .) (include "platform.env.smtp" .)) }}
+{{- $alerter = printf "%s\n- {name: PUBLIC_URL, value: %s}\n- {name: INTERVAL, value: %s}" $alerter (include "platform.publicURL" . | quote) (.Values.alerter.interval | quote) }}
+{{ include "platform.goWorkload" (dict "ctx" $ "name" "alerter" "binary" "alerter" "probePort" 8080 "probe" "/healthz" "values" .Values.alerter "env" $alerter) }}
+{{- end }}
+{{- if .Values.modules.synthetics }}
+---
+{{- $prober := join "\n" (list (include "platform.env.edition" .) (include "platform.env.database" .) (include "platform.env.flags" .)) }}
+{{- $prober = printf "%s\n- {name: LOCATION, value: %s}\n- {name: ALLOW_PRIVATE_TARGETS, value: %s}" $prober (.Values.prober.location | quote) (.Values.prober.allowPrivateTargets | toString | quote) }}
+{{- /* Unprivileged ICMP sockets for the ping probe (a safe sysctl). */ -}}
+{{ include "platform.goWorkload" (dict "ctx" $ "name" "prober" "binary" "prober" "port" 8080 "probePort" 8080 "probe" "/healthz" "values" .Values.prober "env" $prober "sysctls" (list (dict "name" "net.ipv4.ping_group_range" "value" "0 2147483647"))) }}
+{{- end }}
+{{- if .Values.modules.mcp }}
+---
+{{- $mcp := printf "- {name: EDITION, value: community}\n- {name: API_URL, value: \"http://%s-api:8080\"}" $p }}
+{{ include "platform.goWorkload" (dict "ctx" $ "name" "mcp" "binary" "mcp" "port" 8080 "probePort" 8080 "probe" "/healthz" "values" (merge (dict "extraEnv" list) .Values.mcp) "env" $mcp) }}
+{{- end }}
+{{- if $rum }}
+---
+{{- $rumEnv := join "\n" (list (include "platform.env.edition" .) (include "platform.env.database" .) (include "platform.env.s3" .)) }}
+{{ include "platform.goWorkload" (dict "ctx" $ "name" "rum-collector" "binary" "rum-collector" "port" 8090 "probePort" 8090 "probe" "/readyz" "values" .Values.rumCollector "env" $rumEnv) }}
+{{- end }}

@@ -1,0 +1,35 @@
+{{- if and .Values.mailpit.enabled (not .Values.smtp.address) }}
+{{- $ctx := dict "ctx" $ "name" "mailpit" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.name" $ctx }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+spec:
+  selector: {{- include "platform.selector" $ctx | nindent 4 }}
+  ports: [{name: smtp, port: 1025, targetPort: smtp}, {name: http, port: 8025, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.name" $ctx }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {{- include "platform.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "platform.labels" $ctx | nindent 8 }}
+    spec:
+      {{- include "platform.pullSecrets" . | nindent 6 }}
+      {{- include "platform.podSecurity" (dict "uid" 1000) | nindent 6 }}
+      {{- include "platform.scheduling" .Values | nindent 6 }}
+      containers:
+        - name: mailpit
+          image: {{ include "platform.image" (dict "ctx" $ "img" .Values.mailpit.image) }}
+          ports: [{name: smtp, containerPort: 1025}, {name: http, containerPort: 8025}]
+          readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10}
+          resources: {{- toYaml .Values.mailpit.resources | nindent 12 }}
+          {{- include "platform.containerSecurity" . | nindent 10 }}
+{{- end }}

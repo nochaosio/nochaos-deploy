@@ -1,0 +1,268 @@
+global:
+  # Prefix of every object name (default: the release name). Must match the
+  # prefix of the nochaos-stores (and nochaos-stream) release.
+  prefix: ""
+  imageRegistry: ""
+  storageClass: ""
+  imagePullSecrets: []
+
+# Where people open the portal (links in e-mails, cookies, Grafana's root URL).
+publicURL: http://localhost:8080
+# Where agents and SDKs send OTLP (shown in the portal's onboarding).
+ingestURL: http://localhost:4318
+
+# The nochaos images (one image for every Go service).
+image:
+  services: {repository: ghcr.io/nochaosio/nochaos/services, tag: ""}
+  portal: {repository: ghcr.io/nochaosio/nochaos/portal, tag: ""}
+  # Empty tag: the chart's appVersion.
+  pullPolicy: IfNotPresent
+
+# Product modules. A module that is off is hidden in the portal (flagd) and
+# its workload is not started.
+modules:
+  alerts: true
+  analytics: true
+  anomalies: true
+  apm: true
+  catalog: true
+  deployments: true
+  events: true
+  flow: false # needs the Telemetry Flow lab (FLOW_URL), not part of this chart
+  incidents: true
+  infrastructure: true
+  llm: true
+  logs: true
+  mcp: true
+  metrics: true
+  notebooks: true
+  replay: true
+  rum: true
+  schema: true
+  slo: true
+  synthetics: true
+  templates: true
+
+# The fixed stores (TENANT_BACKENDS). "auto" points at the nochaos-stores
+# chart installed with the same prefix in this namespace; an empty value
+# leaves the store out; anything else is used as the URL.
+stores:
+  metrics: auto
+  traces: auto
+  logs: auto
+  events: auto
+  grafana: auto
+  jaeger: auto
+
+# Kafka and Flink (nochaos-stream chart): the pipeline and events-gw also
+# produce to Kafka, so the stream jobs (usage, trace analytics, log patterns,
+# schema drift, insights) see the data.
+stream:
+  enabled: false
+  # Empty: <prefix>-kafka:9092 (the nochaos-stream chart).
+  kafkaBrokers: ""
+
+# First run: without it, the portal asks for the organization and its admin
+# on the first visit. With it, the API creates them on start.
+admin:
+  organization: ""
+  email: ""
+  username: ""
+  # Or an existing Secret with the key "password".
+  password: ""
+  existingSecret: ""
+
+# Generated on install and kept on upgrades when empty.
+secrets:
+  # Seals notification channel URLs and second-factor secrets (64 hex chars).
+  notifyKey: ""
+  # Use an existing Secret with every key below instead of the generated one:
+  # postgres-password, redis-password, notify-key, s3-access-key,
+  # s3-secret-key, garage-rpc-secret, garage-admin-token.
+  existingSecret: ""
+
+# Technical guards of the community edition (docs/editions.md).
+guards:
+  rateLimitRPS: 1000 # ingestion requests per second per organization, 0 = off
+  retentionDays: 0 # query window cap, 0 = the stores decide
+  rumReplay: true
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+api:
+  replicas: 1
+  extraEnv: []
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+authz:
+  replicas: 1
+  extraEnv: []
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 1Gi}
+
+tenantRouter:
+  replicas: 1
+  extraEnv: []
+  resources:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {memory: 256Mi}
+
+alerter:
+  replicas: 1
+  interval: 60s
+  extraEnv: []
+  resources:
+    requests: {cpu: 20m, memory: 24Mi}
+    limits: {memory: 128Mi}
+
+prober:
+  replicas: 1
+  location: default
+  # Allow probes of private addresses (in-cluster services). Off: only the
+  # internet can be probed.
+  allowPrivateTargets: false
+  extraEnv: []
+  resources:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {memory: 192Mi}
+
+mcp:
+  replicas: 1
+  resources:
+    requests: {cpu: 10m, memory: 16Mi}
+    limits: {memory: 128Mi}
+
+rumCollector:
+  replicas: 1
+  extraEnv: []
+  resources:
+    requests: {cpu: 50m, memory: 48Mi}
+    limits: {memory: 512Mi}
+
+portal:
+  replicas: 1
+  resources:
+    requests: {cpu: 10m, memory: 16Mi}
+    limits: {memory: 64Mi}
+
+# Envoy: the entry point. Port 8080 serves the portal and its API, port 4318
+# OTLP over HTTP and gRPC, events and browser sessions, checked by authz.
+edge:
+  replicas: 1
+  image: {repository: envoyproxy/envoy, tag: v1.40.0}
+  # Proxies in front of Envoy that append to X-Forwarded-For (1 behind an
+  # ingress controller or a load balancer that does).
+  trustedHops: 0
+  service:
+    type: ClusterIP
+    appPort: 8080
+    ingestPort: 4318
+    annotations: {}
+    nodePorts: {app: "", ingest: ""}
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+# OpenTelemetry Collector: stamps the tenant, computes the RED metrics from
+# spans and writes through tenant-router.
+pipeline:
+  replicas: 1
+  image: {repository: otel/opentelemetry-collector-contrib, tag: 0.162.0}
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {memory: 1Gi}
+
+# Vector: shapes business events (module events) for ClickHouse.
+eventsGateway:
+  replicas: 1
+  image: {repository: timberio/vector, tag: 0.59.0-alpine}
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+# OpenFeature flagd: the module flags.
+flagd:
+  image: {repository: ghcr.io/open-feature/flagd, tag: v0.17.0}
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # Two hosts: the portal and the ingestion endpoint.
+  app: {host: nochaos.example.com}
+  ingest: {host: ingest.nochaos.example.com}
+  tls: []
+
+# PostgreSQL. Set enabled=false and externalDatabase.url to use your own.
+postgresql:
+  enabled: true
+  image: {repository: postgres, tag: 18.6-alpine}
+  database: oop
+  username: oop
+  persistence: {enabled: true, size: 5Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 1Gi}
+
+externalDatabase:
+  # postgres://user:password@host:5432/db?sslmode=require
+  url: ""
+  existingSecret: "" # a Secret with the key "url" instead of url
+
+# Redis: sessions, rate limits, caches.
+redis:
+  enabled: true
+  image: {repository: redis, tag: 8-alpine}
+  persistence: {enabled: true, size: 1Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {memory: 256Mi}
+
+externalRedis:
+  address: "" # host:6379
+  password: ""
+
+# Garage (S3): session recordings of the rum and replay modules.
+garage:
+  enabled: true
+  image: {repository: dxflrs/garage, tag: v2.4.1}
+  bootstrapImage: {repository: curlimages/curl, tag: 8.17.0}
+  bucket: sessions
+  capacity: 10G
+  persistence: {enabled: true, size: 10Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+# Any S3 instead of Garage (garage.enabled=false).
+externalS3:
+  endpoint: "" # host:port
+  region: us-east-1
+  bucket: sessions
+  ssl: true
+  accessKey: ""
+  secretKey: ""
+
+# SMTP for invitations, password resets and alert e-mails. Empty address:
+# the bundled mail catcher when mailpit.enabled, otherwise no e-mail.
+smtp:
+  address: "" # host:port
+  user: ""
+  password: ""
+  from: ""
+
+# Mailpit catches every e-mail (UI on port 8025) when no SMTP relay is set.
+mailpit:
+  enabled: true
+  image: {repository: axllent/mailpit, tag: v1.31.5}
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
