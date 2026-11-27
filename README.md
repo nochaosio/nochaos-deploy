@@ -8,7 +8,7 @@ nochaos keeps a strict line:
 
 - **The software** (the platform and its plugins) does not know where it
   runs. It is the same code on a laptop and on a large cluster. It lives in
-  `nochaos` and [`nochaos-plugins`](https://github.com/nochaosio/nochaos-plugins).
+  `nochaos` (plugins included, in `apps/services/plugins`).
 - **The topology** (how many machines, which tools, how they are wired) lives
   here. This repository holds recipes and no product code: it only consumes
   released versions of the software.
