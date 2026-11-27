@@ -1,0 +1,27 @@
+nochaos community edition is installing (prefix "{{ include "platform.prefix" . }}").
+
+Stores (TENANT_BACKENDS): {{ include "platform.backends" . }}
+{{- if not (include "platform.backends" .) }}
+WARNING: no stores configured; install nochaos-stores with the same prefix or set stores.*.
+{{- end }}
+
+Open the portal:
+{{- if .Values.ingress.enabled }}
+  {{ include "platform.publicURL" . }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "platform.prefix" . }}-edge 8080:{{ .Values.edge.service.appPort }} 4318:{{ .Values.edge.service.ingestPort }}
+  then {{ include "platform.publicURL" . }}
+{{- end }}
+{{- if .Values.admin.email }}
+Sign in as {{ .Values.admin.username }}.
+{{- else }}
+The first visit asks for the organization and its admin.
+{{- end }}
+
+Send OTLP to {{ include "platform.ingestURL" . }} with an API key from Settings > API keys
+(header "Authorization: Bearer <key>").
+{{- if and .Values.mailpit.enabled (not .Values.smtp.address) }}
+
+E-mails are caught by Mailpit:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "platform.prefix" . }}-mailpit 8025
+{{- end }}

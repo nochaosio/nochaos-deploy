@@ -1,0 +1,44 @@
+global:
+  # Must match the prefix of the nochaos-platform release.
+  prefix: ""
+  imageRegistry: ""
+  storageClass: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# The platform's Secret (postgres-password, redis-password). Empty: <prefix>-secrets.
+platformSecret: ""
+# Where the platform's PostgreSQL and Redis are. Empty: <prefix>-postgres and <prefix>-redis.
+postgres: {host: "", database: oop, username: oop}
+redis: {host: ""}
+
+kafka:
+  image: {repository: apache/kafka, tag: 4.3.1}
+  retentionHours: 6
+  partitions: 3
+  topics: [otlp.traces, otlp.metrics, otlp.logs, events.raw, platform.usage, platform.storage-usage]
+  persistence: {enabled: true, size: 10Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {memory: 1536Mi}
+
+# One pod with a JobManager and a TaskManager sharing the checkpoint volume.
+flink:
+  image: {repository: ghcr.io/nochaosio/nochaos/flink-jobs, tag: ""}
+  pullPolicy: IfNotPresent
+  jobManagerMemory: 1024m
+  taskManagerMemory: 2048m
+  slots: 8
+  # Empty: every community job (usage-aggregator, telemetry-insights,
+  # trace-analytics, log-patterns, schema-drift).
+  jobs: ""
+  persistence: {enabled: true, size: 5Gi, storageClass: ""}
+  resources:
+    jobmanager:
+      requests: {cpu: 100m, memory: 1Gi}
+      limits: {memory: 1152Mi}
+    taskmanager:
+      requests: {cpu: 200m, memory: 2Gi}
+      limits: {memory: 2304Mi}

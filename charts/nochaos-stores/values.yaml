@@ -1,0 +1,93 @@
+global:
+  # Prefix of every object name (default: the release name). The platform
+  # chart finds the stores by it, so both charts must use the same prefix.
+  prefix: ""
+  # Registry prepended to every image (a mirror), empty for the images as written.
+  imageRegistry: ""
+  # StorageClass of every volume that does not set its own.
+  storageClass: ""
+
+# URL people open the portal on. Grafana is served under <publicURL>/grafana/
+# (the platform's API proxies it there).
+publicURL: http://localhost:8080
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# VictoriaMetrics: metrics and the RED metrics computed from spans.
+metrics:
+  enabled: true
+  image: {repository: victoriametrics/victoria-metrics, tag: v1.154.0}
+  retention: 30d
+  # One sample per series per minute: the spanmetrics flush interval of the
+  # pipeline is the storage resolution.
+  dedupInterval: 60s
+  maxHourlySeries: 500000
+  maxDailySeries: 1000000
+  extraArgs: []
+  persistence: {enabled: true, size: 10Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 1Gi}
+
+# VictoriaLogs.
+logs:
+  enabled: true
+  image: {repository: victoriametrics/victoria-logs, tag: v1.53.0}
+  retention: 7d
+  # Oldest data is dropped above this size; keep it below persistence.size.
+  maxDiskSpaceUsage: 8GiB
+  extraArgs: []
+  persistence: {enabled: true, size: 10Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 1Gi}
+
+# VictoriaTraces, with the service graph task (APM service map).
+traces:
+  enabled: true
+  image: {repository: victoriametrics/victoria-traces, tag: v0.12.0}
+  retention: 7d
+  maxDiskSpaceUsage: 8GiB
+  extraArgs: []
+  persistence: {enabled: true, size: 10Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+    limits: {memory: 1Gi}
+
+# ClickHouse: business events (module events, funnels, analytics).
+events:
+  enabled: true
+  image: {repository: clickhouse/clickhouse-server, tag: 26.3.50.11-alpine}
+  retentionDays: 7
+  # max_server_memory_usage of ClickHouse; keep it below the memory limit.
+  maxServerMemory: 629145600
+  persistence: {enabled: true, size: 5Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+    limits: {memory: 1Gi}
+
+# Grafana behind the platform's auth proxy (no login form of its own).
+grafana:
+  enabled: true
+  image: {repository: grafana/grafana, tag: 13.2.5}
+  # Installed on start (needs egress to grafana.com). Set to [] with an image
+  # that already carries them.
+  plugins: [victoriametrics-logs-datasource, grafana-clickhouse-datasource]
+  persistence: {enabled: true, size: 1Gi, storageClass: ""}
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+    limits: {memory: 640Mi}
+
+# Jaeger UI over VictoriaTraces, served under /jaeger/. The UI assets are
+# downloaded from the jaeger-ui release on start (needs egress to github.com).
+jaeger:
+  enabled: true
+  image: {repository: nginxinc/nginx-unprivileged, tag: 1.31-alpine}
+  assetsImage: {repository: alpine, tag: "3.24"}
+  # v1.x: Jaeger UI 2.x calls /api/v3, which VictoriaTraces does not serve.
+  uiVersion: v1.76.0
+  resources:
+    requests: {cpu: 5m, memory: 16Mi}
+    limits: {memory: 64Mi}

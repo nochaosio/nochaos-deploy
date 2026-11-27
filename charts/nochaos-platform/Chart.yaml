@@ -1,0 +1,14 @@
+apiVersion: v2
+name: nochaos-platform
+description: The nochaos community edition platform (API, portal, ingestion edge, telemetry pipeline, alerting, synthetic probes, RUM) with PostgreSQL, Redis, Garage and flagd
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
+home: https://github.com/nochaosio/nochaos
+sources:
+  - https://github.com/nochaosio/nochaos-helm-charts
+  - https://github.com/nochaosio/nochaos
+keywords: [nochaos, observability, opentelemetry, apm, rum]
+maintainers:
+  - name: nochaos
+    url: https://github.com/nochaosio

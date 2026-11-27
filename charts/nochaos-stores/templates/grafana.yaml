@@ -1,0 +1,104 @@
+{{- if .Values.grafana.enabled }}
+{{- $ctx := dict "ctx" $ "name" "grafana" }}
+{{- $p := include "stores.prefix" . }}
+{{- $datasources := include "stores.grafanaDatasources" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stores.name" $ctx }}
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+data:
+  datasources.yaml: |
+    {{- $datasources | nindent 4 }}
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - {name: nochaos, folder: nochaos, type: file, disableDeletion: true, allowUiUpdates: false, options: {path: /var/lib/grafana/dashboards}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stores.name" $ctx }}-dashboards
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+data:
+  red.json: |
+{{ .Files.Get "files/red-dashboard.json" | indent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stores.name" $ctx }}
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+spec:
+  selector: {{- include "stores.selector" $ctx | nindent 4 }}
+  ports: [{name: http, port: 3000, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "stores.name" $ctx }}
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+spec:
+  serviceName: {{ include "stores.name" $ctx }}
+  replicas: 1
+  selector:
+    matchLabels: {{- include "stores.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stores.labels" $ctx | nindent 8 }}
+      annotations:
+        # Grafana reads provisioning only at startup.
+        checksum/provisioning: {{ printf "%v%v" $datasources (.Files.Get "files/red-dashboard.json") | sha256sum | trunc 16 }}
+    spec:
+      {{- include "stores.podSecurity" (dict "uid" 472) | nindent 6 }}
+      {{- include "stores.scheduling" .Values | nindent 6 }}
+      containers:
+        - name: grafana
+          image: {{ include "stores.image" (dict "ctx" $ "img" .Values.grafana.image) }}
+          env:
+            # Behind the platform's API: it signs people in and sends their
+            # username and role in X-WEBAUTH-USER and X-WEBAUTH-ROLE.
+            - {name: GF_SERVER_ROOT_URL, value: {{ printf "%s/grafana/" (include "stores.publicURL" .) | quote }}}
+            - {name: GF_SERVER_SERVE_FROM_SUB_PATH, value: "true"}
+            - {name: GF_AUTH_PROXY_ENABLED, value: "true"}
+            - {name: GF_AUTH_PROXY_HEADER_NAME, value: X-WEBAUTH-USER}
+            - {name: GF_AUTH_PROXY_HEADER_PROPERTY, value: username}
+            - {name: GF_AUTH_PROXY_AUTO_SIGN_UP, value: "true"}
+            - {name: GF_AUTH_PROXY_HEADERS, value: "Role:X-WEBAUTH-ROLE"}
+            - {name: GF_AUTH_DISABLE_LOGIN_FORM, value: "true"}
+            - {name: GF_AUTH_DISABLE_SIGNOUT_MENU, value: "true"}
+            - {name: GF_USERS_AUTO_ASSIGN_ORG_ROLE, value: Editor}
+            - {name: GF_USERS_VIEWERS_CAN_EDIT, value: "true"}
+            - {name: GF_USERS_ALLOW_SIGN_UP, value: "false"}
+            - {name: GF_USERS_ALLOW_ORG_CREATE, value: "false"}
+            - {name: GF_SECURITY_ALLOW_EMBEDDING, value: "true"}
+            - {name: GF_SECURITY_COOKIE_SECURE, value: {{ hasPrefix "https://" (include "stores.publicURL" .) | quote }}}
+            - {name: GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION, value: "true"}
+            - {name: GF_PLUGIN_ADMIN_ENABLED, value: "false"}
+            - {name: GF_PLUGINS_PLUGIN_CATALOG_HIDDEN_PLUGINS, value: "*"}
+            {{- with .Values.grafana.plugins }}
+            - {name: GF_PLUGINS_PREINSTALL_SYNC, value: {{ join "," . | quote }}}
+            {{- end }}
+            - {name: GF_ANALYTICS_REPORTING_ENABLED, value: "false"}
+            - {name: GF_ANALYTICS_CHECK_FOR_UPDATES, value: "false"}
+            - {name: GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES, value: "false"}
+            - {name: GF_NEWS_NEWS_FEED_ENABLED, value: "false"}
+            - {name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH, value: /var/lib/grafana/dashboards/red.json}
+            - {name: GF_LOG_LEVEL, value: warn}
+          ports: [{name: http, containerPort: 3000}]
+          # The first start runs every database migration and installs the plugins.
+          startupProbe: {httpGet: {path: /grafana/api/health, port: http}, periodSeconds: 5, failureThreshold: 120}
+          readinessProbe: {httpGet: {path: /grafana/api/health, port: http}, periodSeconds: 10, timeoutSeconds: 5}
+          resources: {{- toYaml .Values.grafana.resources | nindent 12 }}
+          {{- include "stores.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: provisioning, mountPath: /etc/grafana/provisioning/datasources/nochaos.yaml, subPath: datasources.yaml}
+            - {name: provisioning, mountPath: /etc/grafana/provisioning/dashboards/nochaos.yaml, subPath: dashboards.yaml}
+            - {name: dashboards, mountPath: /var/lib/grafana/dashboards}
+            - {name: data, mountPath: /var/lib/grafana}
+      volumes:
+        - {name: provisioning, configMap: {name: {{ include "stores.name" $ctx }}}}
+        - {name: dashboards, configMap: {name: {{ include "stores.name" $ctx }}-dashboards}}
+        {{- include "stores.dataVolume" .Values.grafana | nindent 8 }}
+  {{- include "stores.claims" (dict "persistence" .Values.grafana.persistence "global" (include "stores.storesStorageClass" .)) | nindent 2 }}
+{{- end }}

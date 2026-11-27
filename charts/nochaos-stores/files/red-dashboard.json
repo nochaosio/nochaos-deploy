@@ -1,0 +1,407 @@
+{
+  "uid": "oop-red",
+  "title": "RED by service: metrics and logs",
+  "tags": [
+    "logs",
+    "oop",
+    "red"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 5,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "metrics"
+        },
+        "query": {
+          "query": "label_values(oop_red_calls_total, service_name)",
+          "refId": "Q"
+        },
+        "definition": "label_values(oop_red_calls_total, service_name)",
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "allValue": ".*"
+      },
+      {
+        "name": "env",
+        "type": "query",
+        "label": "Environment",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "metrics"
+        },
+        "query": {
+          "query": "label_values(oop_red_calls_total, deployment_environment_name)",
+          "refId": "E"
+        },
+        "definition": "label_values(oop_red_calls_total, deployment_environment_name)",
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "allValue": ".*"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Rate (req/s)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name) (sum_over_time(oop_red_calls_total{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[$__interval])) / ($__interval_ms / 1000)",
+          "legendFormat": "{{service_name}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Errors (%)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "metrics"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum by (service_name) (sum_over_time(oop_red_calls_total{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\",status_code=\"STATUS_CODE_ERROR\"}[$__interval])) / sum by (service_name) (sum_over_time(oop_red_calls_total{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[$__interval]))",
+          "legendFormat": "{{service_name}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Duration p50 / p95 / p99",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "metrics"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le, vmrange) (sum_over_time(oop_red_duration_milliseconds_bucket{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[$__interval])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, vmrange) (sum_over_time(oop_red_duration_milliseconds_bucket{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[$__interval])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (le, vmrange) (sum_over_time(oop_red_duration_milliseconds_bucket{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[$__interval])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Log volume by severity",
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 10,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "lineWidth": 1
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*(ERROR|FATAL|error|fatal).*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*(WARN|warn).*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "logs"
+          },
+          "queryType": "statsRange",
+          "expr": "service.name:~\"^(${service:regex})$\" deployment.environment.name:~\"^(${env:regex})$\" | stats by (severity_text) count() as logs",
+          "legendFormat": "{{severity_text}}"
+        }
+      ],
+      "interval": "1m",
+      "maxDataPoints": 120
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Endpoints",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "metrics"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 7,
+        "w": 14,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name, span_name) (sum_over_time(oop_red_calls_total{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[$__range])) / $__range_s",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (service_name, span_name) (sum_over_time(oop_red_calls_total{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\",status_code=\"STATUS_CODE_ERROR\"}[$__range])) / sum by (service_name, span_name) (sum_over_time(oop_red_calls_total{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[$__range]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum by (le, vmrange, service_name, span_name) (sum_over_time(oop_red_duration_milliseconds_bucket{service_name=~\"$service\",deployment_environment_name=~\"$env\",span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\"}[$__range])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "service_name": "Service",
+              "span_name": "Endpoint",
+              "Value #A": "req/s",
+              "Value #B": "Error ratio",
+              "Value #C": "p95 (ms)"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error ratio"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "req/s"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "reqps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": "logs",
+      "title": "Logs",
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 14
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "dedupStrategy": "none",
+        "showLabels": false,
+        "showCommonLabels": false
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "logs"
+          },
+          "queryType": "instant",
+          "expr": "service.name:~\"^(${service:regex})$\" deployment.environment.name:~\"^(${env:regex})$\" | copy severity_text as level",
+          "maxLines": 500
+        }
+      ]
+    }
+  ],
+  "description": "RED metrics from span metrics and the logs of the same services and environment, on one board."
+}

@@ -1,0 +1,17 @@
+nochaos community edition (release {{ .Release.Name }}).
+
+Open the portal:
+{{- if dig "ingress" "enabled" false .Values.platform }}
+  {{ .Values.global.publicURL }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Values.global.prefix | default .Release.Name }}-edge 8080:8080 4318:4318
+  then {{ .Values.global.publicURL }}
+{{- end }}
+{{- if dig "admin" "email" "" .Values.platform }}
+Sign in as {{ dig "admin" "username" "" .Values.platform }}.
+{{- else }}
+The first visit asks for the organization and its admin.
+{{- end }}
+
+Send OTLP to {{ .Values.global.ingestURL }} with an API key from Settings
+(header "Authorization: Bearer <key>").

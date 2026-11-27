@@ -1,0 +1,104 @@
+{{- $p := include "stream.prefix" . }}
+{{- $ctx := dict "ctx" $ "name" "flink" }}
+{{- $secret := .Values.platformSecret | default (printf "%s-secrets" $p) }}
+{{- $img := include "stream.image" (dict "ctx" $ "img" (dict "repository" .Values.flink.image.repository "tag" (.Values.flink.image.tag | default .Chart.AppVersion))) }}
+{{- define "stream.flinkEnv" -}}
+{{- $p := include "stream.prefix" . -}}
+- {name: EDITION, value: community}
+- {name: KAFKA_BROKERS, value: "{{ $p }}-kafka:9092"}
+- {name: REDIS_HOST, value: {{ .Values.redis.host | default (printf "%s-redis" $p) | quote }}}
+- name: REDIS_PASSWORD
+  valueFrom: {secretKeyRef: {name: {{ .Values.platformSecret | default (printf "%s-secrets" $p) }}, key: redis-password}}
+- {name: JDBC_URL, value: "jdbc:postgresql://{{ .Values.postgres.host | default (printf "%s-postgres" $p) }}:5432/{{ .Values.postgres.database }}"}
+- {name: JDBC_USER, value: {{ .Values.postgres.username | quote }}}
+- name: JDBC_PASSWORD
+  valueFrom: {secretKeyRef: {name: {{ .Values.platformSecret | default (printf "%s-secrets" $p) }}, key: postgres-password}}
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stream.name" $ctx }}
+  labels: {{- include "stream.labels" $ctx | nindent 4 }}
+spec:
+  selector: {{- include "stream.selector" $ctx | nindent 4 }}
+  ports: [{name: http, port: 8081, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "stream.name" $ctx }}
+  labels: {{- include "stream.labels" $ctx | nindent 4 }}
+spec:
+  serviceName: {{ include "stream.name" $ctx }}
+  replicas: 1
+  selector:
+    matchLabels: {{- include "stream.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stream.labels" $ctx | nindent 8 }}
+    spec:
+      {{- include "stream.podSecurity" (dict "uid" 9999) | nindent 6 }}
+      {{- include "stream.scheduling" .Values | nindent 6 }}
+      {{- $props := printf `jobmanager.rpc.address: localhost
+jobmanager.memory.process.size: %s
+taskmanager.memory.process.size: %s
+taskmanager.numberOfTaskSlots: %v
+parallelism.default: 1
+state.backend.type: hashmap
+execution.checkpointing.dir: file:///flink-data/checkpoints
+execution.checkpointing.savepoint-dir: file:///flink-data/savepoints
+execution.checkpointing.num-retained: 2
+restart-strategy.type: exponential-delay` .Values.flink.jobManagerMemory .Values.flink.taskManagerMemory (int .Values.flink.slots) }}
+      containers:
+        {{- range $role := list "jobmanager" "taskmanager" }}
+        - name: {{ $role }}
+          image: {{ $img }}
+          imagePullPolicy: {{ $.Values.flink.pullPolicy }}
+          args: [{{ $role }}]
+          env:
+            {{- include "stream.flinkEnv" $ | nindent 12 }}
+            - name: FLINK_PROPERTIES
+              value: |
+                {{- $props | nindent 16 }}
+          {{- if eq $role "jobmanager" }}
+          ports: [{name: http, containerPort: 8081}]
+          readinessProbe: {httpGet: {path: /overview, port: http}, periodSeconds: 10, initialDelaySeconds: 10}
+          {{- end }}
+          resources: {{- toYaml (index $.Values.flink.resources $role) | nindent 12 }}
+          {{- include "stream.containerSecurity" $ | nindent 10 }}
+          volumeMounts: [{name: data, mountPath: /flink-data}]
+        {{- end }}
+      {{- with (include "stream.dataVolume" .Values.flink) }}
+      volumes: {{- . | nindent 8 }}
+      {{- end }}
+  {{- include "stream.claims" (dict "persistence" .Values.flink.persistence "global" (include "stream.storesStorageClass" .)) | nindent 2 }}
+---
+# Submits every job that is not running this build (submit-jobs.sh of the image).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "stream.name" $ctx }}-submit
+  labels: {{- include "stream.labels" (dict "ctx" $ "name" "flink-submit") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels: {{- include "stream.labels" (dict "ctx" $ "name" "flink-submit") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      {{- include "stream.podSecurity" (dict "uid" 9999) | nindent 6 }}
+      containers:
+        - name: submit
+          image: {{ $img }}
+          imagePullPolicy: {{ .Values.flink.pullPolicy }}
+          command: [/opt/flink/usrlib/submit-jobs.sh]
+          env:
+            - {name: FLINK_JOBMANAGER, value: "{{ include "stream.name" $ctx }}:8081"}
+            - {name: OOP_JOBS, value: {{ .Values.flink.jobs | quote }}}
+            {{- include "stream.flinkEnv" . | nindent 12 }}
+          resources: {requests: {cpu: 100m, memory: 512Mi}, limits: {memory: 1Gi}}
+          {{- include "stream.containerSecurity" . | nindent 10 }}

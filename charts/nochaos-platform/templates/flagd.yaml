@@ -1,0 +1,49 @@
+{{- $ctx := dict "ctx" $ "name" "flagd" }}
+{{- $flags := dict }}
+{{- range $m, $on := .Values.modules }}
+{{- $_ := set $flags (printf "module.%s" $m) (dict "state" "ENABLED" "variants" (dict "on" true "off" false) "defaultVariant" (ternary "on" "off" $on)) }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "platform.name" $ctx }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+data:
+  # Module flags: the portal hides a module that is off, its API answers 404.
+  modules.flagd.json: |
+    {{- dict "$schema" "https://flagd.dev/schema/v0/flags.json" "flags" $flags | toPrettyJson | nindent 4 }}
+---
+{{ include "platform.service" (merge (dict "port" 8016) $ctx) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.name" $ctx }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {{- include "platform.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "platform.labels" $ctx | nindent 8 }}
+    spec:
+      {{- include "platform.pullSecrets" . | nindent 6 }}
+      {{- include "platform.podSecurity" (dict "uid" 65532) | nindent 6 }}
+      {{- include "platform.scheduling" .Values | nindent 6 }}
+      containers:
+        - name: flagd
+          image: {{ include "platform.image" (dict "ctx" $ "img" .Values.flagd.image) }}
+          # flagd watches the file: a module switched in values applies without a restart.
+          args: [start, --uri, file:/etc/flagd/modules.flagd.json, --ofrep-port, "8016", --management-port, "8014"]
+          ports: [{name: ofrep, containerPort: 8016}, {name: management, containerPort: 8014}]
+          readinessProbe: {httpGet: {path: /readyz, port: 8014}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: 8014}, periodSeconds: 20}
+          resources: {{- toYaml .Values.flagd.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts: [{name: flags, mountPath: /etc/flagd, readOnly: true}]
+      volumes:
+        - {name: flags, configMap: {name: {{ include "platform.name" $ctx }}}}

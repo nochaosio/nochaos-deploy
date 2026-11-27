@@ -1,0 +1,3 @@
+# Only the core: no alerts, probes, MCP, RUM or events; external SMTP.
+modules: {alerts: false, synthetics: false, mcp: false, rum: false, replay: false, events: false}
+smtp: {address: smtp.example.com:587, user: nochaos, password: secret, from: nochaos@example.com}

@@ -1,0 +1,6 @@
+# CI: no volumes, small footprint.
+metrics: {persistence: {enabled: false}}
+logs: {persistence: {enabled: false}}
+traces: {persistence: {enabled: false}}
+events: {persistence: {enabled: false}}
+grafana: {persistence: {enabled: false}}

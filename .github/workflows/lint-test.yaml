@@ -1,0 +1,35 @@
+name: lint-test
+on:
+  pull_request:
+  push: {branches: [main]}
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: azure/setup-helm@v4
+        with: {version: v3.19.0}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - uses: helm/chart-testing-action@v2.7.0
+      - name: Template every chart with its CI values
+        run: scripts/check.sh
+      - name: ct lint
+        run: ct lint --config .github/configs/ct.yaml --all
+  install:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: azure/setup-helm@v4
+        with: {version: v3.19.0}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - uses: helm/chart-testing-action@v2.7.0
+      - uses: helm/kind-action@v1
+      - name: ct install
+        run: ct install --config .github/configs/ct-install.yaml --all

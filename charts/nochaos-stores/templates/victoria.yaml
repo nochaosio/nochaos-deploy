@@ -1,0 +1,75 @@
+{{- /* VictoriaMetrics, VictoriaLogs and VictoriaTraces: one StatefulSet each. */ -}}
+{{- $sc := include "stores.storesStorageClass" . -}}
+{{- $stores := list
+  (dict "key" "metrics" "port" 8428 "args" (list
+      (printf "-retentionPeriod=%s" .Values.metrics.retention)
+      (printf "-dedup.minScrapeInterval=%s" .Values.metrics.dedupInterval)
+      (printf "-storage.maxHourlySeries=%v" (int64 .Values.metrics.maxHourlySeries))
+      (printf "-storage.maxDailySeries=%v" (int64 .Values.metrics.maxDailySeries))
+      "-opentelemetry.usePrometheusNaming"
+      "-search.maxConcurrentRequests=4"))
+  (dict "key" "logs" "port" 9428 "args" (list
+      (printf "-retentionPeriod=%s" .Values.logs.retention)
+      (printf "-retention.maxDiskSpaceUsageBytes=%s" .Values.logs.maxDiskSpaceUsage)))
+  (dict "key" "traces" "port" 10428 "args" (list
+      (printf "-retentionPeriod=%s" .Values.traces.retention)
+      (printf "-retention.maxDiskSpaceUsageBytes=%s" .Values.traces.maxDiskSpaceUsage)
+      "-servicegraph.enableTask=true"
+      "-servicegraph.taskInterval=30s"
+      "-servicegraph.taskLookbehind=1m"))
+-}}
+{{- range $stores }}
+{{- $v := index $.Values .key }}
+{{- if $v.enabled }}
+{{- $ctx := dict "ctx" $ "name" .key }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stores.name" $ctx }}
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+spec:
+  selector: {{- include "stores.selector" $ctx | nindent 4 }}
+  ports: [{name: http, port: {{ .port }}, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "stores.name" $ctx }}
+  labels: {{- include "stores.labels" $ctx | nindent 4 }}
+spec:
+  serviceName: {{ include "stores.name" $ctx }}
+  replicas: 1
+  selector:
+    matchLabels: {{- include "stores.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "stores.labels" $ctx | nindent 8 }}
+    spec:
+      {{- include "stores.podSecurity" (dict "uid" 1000) | nindent 6 }}
+      {{- include "stores.scheduling" $.Values | nindent 6 }}
+      containers:
+        - name: {{ .key }}
+          image: {{ include "stores.image" (dict "ctx" $ "img" $v.image) }}
+          args:
+            - -storageDataPath=/data
+            - -httpListenAddr=:{{ .port }}
+            - -memory.allowedPercent=50
+            {{- range .args }}
+            - {{ . | quote }}
+            {{- end }}
+            {{- range $v.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          ports: [{name: http, containerPort: {{ .port }}}]
+          readinessProbe: {httpGet: {path: /health, port: http}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health, port: http}, periodSeconds: 20, failureThreshold: 6}
+          resources: {{- toYaml $v.resources | nindent 12 }}
+          {{- include "stores.containerSecurity" . | nindent 10 }}
+          volumeMounts: [{name: data, mountPath: /data}]
+      {{- with (include "stores.dataVolume" $v) }}
+      volumes: {{- . | nindent 8 }}
+      {{- end }}
+  {{- include "stores.claims" (dict "persistence" $v.persistence "global" $sc) | nindent 2 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,40 @@
+{{- if .Values.redis.enabled }}
+{{- $ctx := dict "ctx" $ "name" "redis" }}
+{{ include "platform.service" (merge (dict "port" 6379) $ctx) }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "platform.name" $ctx }}
+  labels: {{- include "platform.labels" $ctx | nindent 4 }}
+spec:
+  serviceName: {{ include "platform.name" $ctx }}
+  replicas: 1
+  selector:
+    matchLabels: {{- include "platform.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "platform.labels" $ctx | nindent 8 }}
+    spec:
+      {{- include "platform.pullSecrets" . | nindent 6 }}
+      {{- include "platform.podSecurity" (dict "uid" 999) | nindent 6 }}
+      {{- include "platform.scheduling" .Values | nindent 6 }}
+      containers:
+        - name: redis
+          image: {{ include "platform.image" (dict "ctx" $ "img" .Values.redis.image) }}
+          command: [/bin/sh, -c, 'exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"']
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "platform.secretName" . }}, key: redis-password}}
+            - {name: REDISCLI_AUTH, value: $(REDIS_PASSWORD)}
+          ports: [{name: redis, containerPort: 6379}]
+          readinessProbe: {exec: {command: [redis-cli, ping]}, periodSeconds: 5}
+          livenessProbe: {exec: {command: [redis-cli, ping]}, periodSeconds: 20, failureThreshold: 6}
+          resources: {{- toYaml .Values.redis.resources | nindent 12 }}
+          {{- include "platform.containerSecurity" . | nindent 10 }}
+          volumeMounts: [{name: data, mountPath: /data}]
+      {{- with (include "platform.dataVolume" .Values.redis) }}
+      volumes: {{- . | nindent 8 }}
+      {{- end }}
+  {{- include "platform.claims" (dict "persistence" .Values.redis.persistence "global" (include "platform.storageClass" .)) | nindent 2 }}
+{{- end }}
