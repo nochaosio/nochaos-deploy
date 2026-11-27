@@ -3,6 +3,41 @@ entries:
   nochaos:
   - apiVersion: v2
     appVersion: 0.0.1
+    created: "2026-11-27T02:48:04.987594849Z"
+    dependencies:
+    - alias: platform
+      name: nochaos-platform
+      repository: file://../nochaos-platform
+      version: 0.1.1
+    - alias: stores
+      name: nochaos-stores
+      repository: file://../nochaos-stores
+      version: 0.1.0
+    - alias: stream
+      condition: global.stream.enabled
+      name: nochaos-stream
+      repository: file://../nochaos-stream
+      version: 0.1.0
+    description: The whole nochaos community edition in one release (platform, stores
+      and, optionally, stream analytics)
+    digest: 215732cc3d2ec84ed713b73c1d45febad4ac6fbb64efbaf85cb39ad021e7ccf8
+    home: https://github.com/nochaosio/nochaos
+    keywords:
+    - nochaos
+    - observability
+    - opentelemetry
+    maintainers:
+    - name: nochaos
+      url: https://github.com/nochaosio
+    name: nochaos
+    sources:
+    - https://github.com/nochaosio/nochaos-deploy
+    type: application
+    urls:
+    - https://github.com/nochaosio/nochaos-deploy/releases/download/nochaos-0.1.1/nochaos-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v2
+    appVersion: 0.0.1
     created: "2026-11-27T02:45:47.537187748Z"
     dependencies:
     - alias: platform
@@ -37,6 +72,31 @@ entries:
     - https://github.com/nochaosio/nochaos-deploy/releases/download/nochaos-0.1.0/nochaos-0.1.0.tgz
     version: 0.1.0
   nochaos-platform:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2026-11-27T02:48:05.241819972Z"
+    description: The nochaos community edition platform (API, portal, ingestion edge,
+      telemetry pipeline, alerting, synthetic probes, RUM) with PostgreSQL, Redis,
+      Garage and flagd
+    digest: 01e6743f6c58a0681906cdef5f6f2ad4d4f1a38d5ad0a5ba752a3d07b3ec3199
+    home: https://github.com/nochaosio/nochaos
+    keywords:
+    - nochaos
+    - observability
+    - opentelemetry
+    - apm
+    - rum
+    maintainers:
+    - name: nochaos
+      url: https://github.com/nochaosio
+    name: nochaos-platform
+    sources:
+    - https://github.com/nochaosio/nochaos-deploy
+    - https://github.com/nochaosio/nochaos
+    type: application
+    urls:
+    - https://github.com/nochaosio/nochaos-deploy/releases/download/nochaos-platform-0.1.1/nochaos-platform-0.1.1.tgz
+    version: 0.1.1
   - apiVersion: v2
     appVersion: 0.0.1
     created: "2026-11-27T02:45:47.692188874Z"
@@ -110,4 +170,4 @@ entries:
     urls:
     - https://github.com/nochaosio/nochaos-deploy/releases/download/nochaos-stream-0.1.0/nochaos-stream-0.1.0.tgz
     version: 0.1.0
-generated: "2026-11-27T02:45:48.005906033Z"
+generated: "2026-11-27T02:48:05.241831814Z"
