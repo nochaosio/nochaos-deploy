@@ -28,7 +28,7 @@ modules:
   catalog: true
   deployments: true
   events: true
-  flow: false # needs the Telemetry Flow lab (FLOW_URL), not part of this chart
+  flow: false  # needs the Telemetry Flow lab (FLOW_URL), not part of this chart
   incidents: true
   infrastructure: true
   llm: true
@@ -83,8 +83,8 @@ secrets:
 
 # Technical guards of the community edition (docs/editions.md).
 guards:
-  rateLimitRPS: 1000 # ingestion requests per second per organization, 0 = off
-  retentionDays: 0 # query window cap, 0 = the stores decide
+  rateLimitRPS: 1000  # ingestion requests per second per organization, 0 = off
+  retentionDays: 0  # query window cap, 0 = the stores decide
   rumReplay: true
 
 nodeSelector: {}
@@ -215,7 +215,7 @@ postgresql:
 externalDatabase:
   # postgres://user:password@host:5432/db?sslmode=require
   url: ""
-  existingSecret: "" # a Secret with the key "url" instead of url
+  existingSecret: ""  # a Secret with the key "url" instead of url
 
 # Redis: sessions, rate limits, caches.
 redis:
@@ -227,7 +227,7 @@ redis:
     limits: {memory: 256Mi}
 
 externalRedis:
-  address: "" # host:6379
+  address: ""  # host:6379
   password: ""
 
 # Garage (S3): session recordings of the rum and replay modules.
@@ -244,7 +244,7 @@ garage:
 
 # Any S3 instead of Garage (garage.enabled=false).
 externalS3:
-  endpoint: "" # host:port
+  endpoint: ""  # host:port
   region: us-east-1
   bucket: sessions
   ssl: true
@@ -254,7 +254,7 @@ externalS3:
 # SMTP for invitations, password resets and alert e-mails. Empty address:
 # the bundled mail catcher when mailpit.enabled, otherwise no e-mail.
 smtp:
-  address: "" # host:port
+  address: ""  # host:port
   user: ""
   password: ""
   from: ""
