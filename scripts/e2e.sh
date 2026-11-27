@@ -56,7 +56,7 @@ fi
 
 echo "== install"
 chart=${CHART:-$root/charts/nochaos}
-if [ -z "${CHART:-}" ]; then $helm dependency build "$chart" >/dev/null; else $helm repo update >/dev/null; fi
+if [ -z "${CHART:-}" ]; then $helm dependency update "$chart" >/dev/null; else $helm repo update >/dev/null; fi
 echo "   chart: $chart${VERSION:+ $VERSION}"
 start=$SECONDS
 $helm upgrade --install "$rel" "$chart" ${VERSION:+--version "$VERSION"} -n "$ns" --create-namespace --wait --timeout 20m "${sets[@]}"
