@@ -2,7 +2,7 @@ apiVersion: v2
 name: nochaos-platform
 description: The nochaos community edition platform (API, portal, ingestion edge, telemetry pipeline, alerting, synthetic probes, RUM) with PostgreSQL, Redis, Garage and flagd
 type: application
-version: 0.1.1
+version: 0.1.2
 appVersion: "0.0.1"
 home: https://github.com/nochaosio/nochaos
 sources:

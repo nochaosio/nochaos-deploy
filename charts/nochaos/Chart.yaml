@@ -2,7 +2,7 @@ apiVersion: v2
 name: nochaos
 description: The whole nochaos community edition in one release (platform, stores and, optionally, stream analytics)
 type: application
-version: 0.1.1
+version: 0.1.2
 appVersion: "0.0.1"
 home: https://github.com/nochaosio/nochaos
 sources:
@@ -13,7 +13,7 @@ maintainers:
     url: https://github.com/nochaosio
 dependencies:
   - name: nochaos-platform
-    version: 0.1.1
+    version: 0.1.2
     repository: file://../nochaos-platform
     alias: platform
   - name: nochaos-stores

@@ -36,6 +36,17 @@ spec:
         seccompProfile: {type: RuntimeDefault}
         sysctls: {{- toYaml . | nindent 10 }}
       {{- end }}
+      {{- if $.Values.postgresql.enabled }}
+      # Wait for the built-in PostgreSQL instead of crash-looping into
+      # Kubernetes' back-off on a fresh install.
+      initContainers:
+        - name: wait-postgres
+          image: {{ include "platform.image" (dict "ctx" $ "img" $.Values.postgresql.image) }}
+          imagePullPolicy: IfNotPresent
+          command: [sh, -c, 'until pg_isready -q -h {{ include "platform.prefix" $ }}-postgres -p 5432; do sleep 2; done']
+          resources: {requests: {cpu: 10m, memory: 16Mi}, limits: {memory: 64Mi}}
+          securityContext: {runAsNonRoot: true, runAsUser: 70, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+      {{- end }}
       containers:
         - name: {{ .name }}
           image: {{ include "platform.servicesImage" $ }}
